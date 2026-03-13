@@ -1,81 +1,89 @@
 
 import java.util.*;
 
-class Transaction {
-    int id;
-    int amount;
-    String merchant;
-    long time;
+class MultiLevelCache {
 
-    Transaction(int id, int amount, String merchant) {
-        this.id = id;
-        this.amount = amount;
-        this.merchant = merchant;
-        this.time = System.currentTimeMillis();
+    private int L1_CAP = 10000;
+    private int L2_CAP = 100000;
+
+    LinkedHashMap<String,String> L1 =
+            new LinkedHashMap<String,String>(L1_CAP,0.75f,true){
+                protected boolean removeEldestEntry(Map.Entry<String,String> e){
+                    return size()>L1_CAP;
+                }
+            };
+
+    LinkedHashMap<String,String> L2 =
+            new LinkedHashMap<String,String>(L2_CAP,0.75f,true){
+                protected boolean removeEldestEntry(Map.Entry<String,String> e){
+                    return size()>L2_CAP;
+                }
+            };
+
+    HashMap<String,String> database = new HashMap<>();
+
+    int L1Hits=0, L2Hits=0, L3Hits=0;
+
+    public void addVideo(String id,String data){
+        database.put(id,data);
+    }
+
+    public String getVideo(String id){
+
+        if(L1.containsKey(id)){
+            L1Hits++;
+            System.out.println("L1 Cache HIT");
+            return L1.get(id);
+        }
+
+        if(L2.containsKey(id)){
+            L2Hits++;
+            System.out.println("L2 Cache HIT → Promoted to L1");
+
+            String data = L2.get(id);
+            L1.put(id,data);
+
+            return data;
+        }
+
+        if(database.containsKey(id)){
+            L3Hits++;
+
+            System.out.println("L3 Database HIT → Added to L2");
+
+            String data = database.get(id);
+            L2.put(id,data);
+
+            return data;
+        }
+
+        return null;
+    }
+
+    public void getStatistics(){
+
+        int total = L1Hits+L2Hits+L3Hits;
+
+        System.out.println("L1 Hit Rate: "+(L1Hits*100.0/total)+"%");
+        System.out.println("L2 Hit Rate: "+(L2Hits*100.0/total)+"%");
+        System.out.println("L3 Hit Rate: "+(L3Hits*100.0/total)+"%");
     }
 }
 
-class TransactionAnalyzer {
-
-    List<Transaction> transactions = new ArrayList<>();
-
-    public void addTransaction(Transaction t) {
-        transactions.add(t);
-    }
-
-    public void findTwoSum(int target) {
-
-        HashMap<Integer, Transaction> map = new HashMap<>();
-
-        for (Transaction t : transactions) {
-
-            int complement = target - t.amount;
-
-            if (map.containsKey(complement)) {
-
-                System.out.println("Pair Found: " +
-                        map.get(complement).id + " , " + t.id);
-            }
-
-            map.put(t.amount, t);
-        }
-    }
-
-    public void detectDuplicates() {
-
-        HashMap<String, List<Transaction>> map = new HashMap<>();
-
-        for (Transaction t : transactions) {
-
-            String key = t.amount + "-" + t.merchant;
-
-            map.putIfAbsent(key, new ArrayList<>());
-            map.get(key).add(t);
-        }
-
-        for (String key : map.keySet()) {
-
-            if (map.get(key).size() > 1) {
-
-                System.out.println("Duplicate detected for " + key);
-            }
-        }
-    }
-}
-
-public class PS09 {
+public class PS10 {
 
     public static void main(String[] args) {
 
-        TransactionAnalyzer analyzer = new TransactionAnalyzer();
+        MultiLevelCache cache = new MultiLevelCache();
 
-        analyzer.addTransaction(new Transaction(1, 500, "StoreA"));
-        analyzer.addTransaction(new Transaction(2, 300, "StoreB"));
-        analyzer.addTransaction(new Transaction(3, 200, "StoreC"));
-        analyzer.addTransaction(new Transaction(4, 500, "StoreA"));
+        cache.addVideo("video_123","Movie Data");
+        cache.addVideo("video_999","Other Movie");
 
-        analyzer.findTwoSum(500);
+        cache.getVideo("video_123");
+        cache.getVideo("video_123");
 
-        analyzer.detectDuplicates();
+        cache.getVideo("video_999");
+
+        cache.getStatistics();
     }
 }
