@@ -1,98 +1,81 @@
-class ParkingSpot {
-    String licensePlate;
-    long entryTime;
+
+import java.util.*;
+
+class Transaction {
+    int id;
+    int amount;
+    String merchant;
+    long time;
+
+    Transaction(int id, int amount, String merchant) {
+        this.id = id;
+        this.amount = amount;
+        this.merchant = merchant;
+        this.time = System.currentTimeMillis();
+    }
 }
 
-class ParkingLot {
+class TransactionAnalyzer {
 
-    private ParkingSpot[] table;
-    private int size;
-    private int occupied = 0;
-    private int totalProbes = 0;
+    List<Transaction> transactions = new ArrayList<>();
 
-    ParkingLot(int capacity) {
-        table = new ParkingSpot[capacity];
-        size = capacity;
+    public void addTransaction(Transaction t) {
+        transactions.add(t);
     }
 
-    private int hash(String plate) {
-        return Math.abs(plate.hashCode()) % size;
-    }
+    public void findTwoSum(int target) {
 
-    public void parkVehicle(String plate) {
+        HashMap<Integer, Transaction> map = new HashMap<>();
 
-        int index = hash(plate);
-        int probes = 0;
+        for (Transaction t : transactions) {
 
-        while (table[index] != null) {
-            index = (index + 1) % size; // linear probing
-            probes++;
-        }
+            int complement = target - t.amount;
 
-        ParkingSpot spot = new ParkingSpot();
-        spot.licensePlate = plate;
-        spot.entryTime = System.currentTimeMillis();
+            if (map.containsKey(complement)) {
 
-        table[index] = spot;
-
-        occupied++;
-        totalProbes += probes;
-
-        System.out.println("Vehicle " + plate +
-                " parked at spot #" + index +
-                " (" + probes + " probes)");
-    }
-
-    public void exitVehicle(String plate) {
-
-        int index = hash(plate);
-
-        while (table[index] != null) {
-
-            if (table[index].licensePlate.equals(plate)) {
-
-                long duration = (System.currentTimeMillis() -
-                        table[index].entryTime) / 1000;
-
-                double fee = duration * 0.05;
-
-                table[index] = null;
-                occupied--;
-
-                System.out.println("Vehicle exited from spot #" + index +
-                        " Duration: " + duration +
-                        "s Fee: $" + fee);
-
-                return;
+                System.out.println("Pair Found: " +
+                        map.get(complement).id + " , " + t.id);
             }
 
-            index = (index + 1) % size;
+            map.put(t.amount, t);
         }
-
-        System.out.println("Vehicle not found");
     }
 
-    public void getStatistics() {
+    public void detectDuplicates() {
 
-        double occupancy = (occupied * 100.0) / size;
-        double avgProbes = (occupied == 0) ? 0 : (double) totalProbes / occupied;
+        HashMap<String, List<Transaction>> map = new HashMap<>();
 
-        System.out.println("Occupancy: " + occupancy + "%");
-        System.out.println("Average probes: " + avgProbes);
+        for (Transaction t : transactions) {
+
+            String key = t.amount + "-" + t.merchant;
+
+            map.putIfAbsent(key, new ArrayList<>());
+            map.get(key).add(t);
+        }
+
+        for (String key : map.keySet()) {
+
+            if (map.get(key).size() > 1) {
+
+                System.out.println("Duplicate detected for " + key);
+            }
+        }
     }
 }
 
-public class PS08 {
+public class PS09 {
+
     public static void main(String[] args) {
 
-        ParkingLot lot = new ParkingLot(500);
+        TransactionAnalyzer analyzer = new TransactionAnalyzer();
 
-        lot.parkVehicle("ABC-1234");
-        lot.parkVehicle("ABC-1235");
-        lot.parkVehicle("XYZ-9999");
+        analyzer.addTransaction(new Transaction(1, 500, "StoreA"));
+        analyzer.addTransaction(new Transaction(2, 300, "StoreB"));
+        analyzer.addTransaction(new Transaction(3, 200, "StoreC"));
+        analyzer.addTransaction(new Transaction(4, 500, "StoreA"));
 
-        lot.exitVehicle("ABC-1234");
+        analyzer.findTwoSum(500);
 
-        lot.getStatistics();
+        analyzer.detectDuplicates();
     }
 }
