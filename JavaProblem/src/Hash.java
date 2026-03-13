@@ -1,75 +1,98 @@
-import java.util.*;
-
-class TrieNode {
-
-    HashMap<Character, TrieNode> children = new HashMap<>();
-    boolean isWord = false;
+class ParkingSpot {
+    String licensePlate;
+    long entryTime;
 }
 
-class AutocompleteSystem {
+class ParkingLot {
 
-    TrieNode root = new TrieNode();
+    private ParkingSpot[] table;
+    private int size;
+    private int occupied = 0;
+    private int totalProbes = 0;
 
-    HashMap<String,Integer> frequency = new HashMap<>();
-
-    public void insert(String query) {
-
-        TrieNode node = root;
-
-        for(char c : query.toCharArray()) {
-
-            node.children.putIfAbsent(c,new TrieNode());
-            node = node.children.get(c);
-        }
-
-        node.isWord = true;
-
-        frequency.put(query,frequency.getOrDefault(query,0)+1);
+    ParkingLot(int capacity) {
+        table = new ParkingSpot[capacity];
+        size = capacity;
     }
 
-    public List<String> search(String prefix) {
-
-        TrieNode node = root;
-
-        for(char c : prefix.toCharArray()) {
-            if(!node.children.containsKey(c))
-                return new ArrayList<>();
-            node = node.children.get(c);
-        }
-
-        List<String> results = new ArrayList<>();
-        dfs(node,prefix,results);
-
-        results.sort((a,b)->frequency.get(b)-frequency.get(a));
-
-        return results.subList(0,Math.min(10,results.size()));
+    private int hash(String plate) {
+        return Math.abs(plate.hashCode()) % size;
     }
 
-    void dfs(TrieNode node,String word,List<String> res){
+    public void parkVehicle(String plate) {
 
-        if(node.isWord)
-            res.add(word);
+        int index = hash(plate);
+        int probes = 0;
 
-        for(char c: node.children.keySet()){
-            dfs(node.children.get(c),word+c,res);
+        while (table[index] != null) {
+            index = (index + 1) % size; // linear probing
+            probes++;
         }
+
+        ParkingSpot spot = new ParkingSpot();
+        spot.licensePlate = plate;
+        spot.entryTime = System.currentTimeMillis();
+
+        table[index] = spot;
+
+        occupied++;
+        totalProbes += probes;
+
+        System.out.println("Vehicle " + plate +
+                " parked at spot #" + index +
+                " (" + probes + " probes)");
+    }
+
+    public void exitVehicle(String plate) {
+
+        int index = hash(plate);
+
+        while (table[index] != null) {
+
+            if (table[index].licensePlate.equals(plate)) {
+
+                long duration = (System.currentTimeMillis() -
+                        table[index].entryTime) / 1000;
+
+                double fee = duration * 0.05;
+
+                table[index] = null;
+                occupied--;
+
+                System.out.println("Vehicle exited from spot #" + index +
+                        " Duration: " + duration +
+                        "s Fee: $" + fee);
+
+                return;
+            }
+
+            index = (index + 1) % size;
+        }
+
+        System.out.println("Vehicle not found");
+    }
+
+    public void getStatistics() {
+
+        double occupancy = (occupied * 100.0) / size;
+        double avgProbes = (occupied == 0) ? 0 : (double) totalProbes / occupied;
+
+        System.out.println("Occupancy: " + occupancy + "%");
+        System.out.println("Average probes: " + avgProbes);
     }
 }
 
-public class PS07 {
-
+public class PS08 {
     public static void main(String[] args) {
 
-        AutocompleteSystem system = new AutocompleteSystem();
+        ParkingLot lot = new ParkingLot(500);
 
-        system.insert("java tutorial");
-        system.insert("javascript");
-        system.insert("java download");
-        system.insert("java tutorial");
+        lot.parkVehicle("ABC-1234");
+        lot.parkVehicle("ABC-1235");
+        lot.parkVehicle("XYZ-9999");
 
-        List<String> results = system.search("jav");
+        lot.exitVehicle("ABC-1234");
 
-        for(String s: results)
-            System.out.println(s);
+        lot.getStatistics();
     }
 }
