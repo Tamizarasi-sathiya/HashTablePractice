@@ -1,77 +1,74 @@
 import java.util.*;
 
-class Event {
-    String url;
-    String userId;
-    String source;
+class TokenBucket {
 
-    Event(String url, String userId, String source) {
-        this.url = url;
-        this.userId = userId;
-        this.source = source;
-    }
-}
+    int tokens;
+    int maxTokens;
+    long lastRefillTime;
+    int refillRate;
 
-class AnalyticsDashboard {
-
-    HashMap<String, Integer> pageViews = new HashMap<>();
-    HashMap<String, Set<String>> uniqueVisitors = new HashMap<>();
-    HashMap<String, Integer> trafficSources = new HashMap<>();
-
-    public void processEvent(Event e) {
-
-        pageViews.put(e.url, pageViews.getOrDefault(e.url, 0) + 1);
-
-        uniqueVisitors.putIfAbsent(e.url, new HashSet<>());
-        uniqueVisitors.get(e.url).add(e.userId);
-
-        trafficSources.put(e.source, trafficSources.getOrDefault(e.source, 0) + 1);
+    TokenBucket(int maxTokens, int refillRate) {
+        this.tokens = maxTokens;
+        this.maxTokens = maxTokens;
+        this.refillRate = refillRate;
+        this.lastRefillTime = System.currentTimeMillis();
     }
 
-    public void getDashboard() {
+    synchronized boolean allowRequest() {
 
-        System.out.println("Top Pages:");
+        refill();
 
-        PriorityQueue<Map.Entry<String,Integer>> pq =
-                new PriorityQueue<>((a,b)->b.getValue()-a.getValue());
-
-        pq.addAll(pageViews.entrySet());
-
-        int count = 0;
-
-        while(!pq.isEmpty() && count < 10) {
-            Map.Entry<String,Integer> e = pq.poll();
-
-            String page = e.getKey();
-            int views = e.getValue();
-            int unique = uniqueVisitors.get(page).size();
-
-            System.out.println(page + " - " + views + " views (" + unique + " unique)");
-            count++;
+        if(tokens > 0) {
+            tokens--;
+            return true;
         }
+        return false;
+    }
 
-        System.out.println("\nTraffic Sources:");
+    void refill() {
 
-        int total = trafficSources.values().stream().mapToInt(i->i).sum();
+        long now = System.currentTimeMillis();
+        long elapsed = (now - lastRefillTime)/1000;
 
-        for(String s : trafficSources.keySet()) {
-            int c = trafficSources.get(s);
-            double percent = (c*100.0)/total;
-            System.out.printf("%s : %.2f%%\n",s,percent);
+        int newTokens = (int)(elapsed * refillRate);
+
+        if(newTokens > 0) {
+            tokens = Math.min(maxTokens, tokens + newTokens);
+            lastRefillTime = now;
         }
     }
 }
 
-public class PS05 {
+class RateLimiter {
+
+    HashMap<String, TokenBucket> clients = new HashMap<>();
+
+    int LIMIT = 1000;
+
+    public boolean checkRateLimit(String clientId) {
+
+        clients.putIfAbsent(clientId,new TokenBucket(LIMIT, LIMIT/3600));
+
+        TokenBucket bucket = clients.get(clientId);
+
+        if(bucket.allowRequest()) {
+            System.out.println("Allowed ("+bucket.tokens+" requests remaining)");
+            return true;
+        }
+        else {
+            System.out.println("Denied (Rate limit exceeded)");
+            return false;
+        }
+    }
+}
+
+public class PS06 {
+
     public static void main(String[] args) {
 
-        AnalyticsDashboard dashboard = new AnalyticsDashboard();
+        RateLimiter limiter = new RateLimiter();
 
-        dashboard.processEvent(new Event("/article/breaking-news","user1","google"));
-        dashboard.processEvent(new Event("/article/breaking-news","user2","facebook"));
-        dashboard.processEvent(new Event("/sports/championship","user3","direct"));
-        dashboard.processEvent(new Event("/article/breaking-news","user1","google"));
-
-        dashboard.getDashboard();
+        for(int i=0;i<5;i++)
+            limiter.checkRateLimit("abc123");
     }
 }
